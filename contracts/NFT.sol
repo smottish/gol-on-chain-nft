@@ -7,13 +7,26 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 contract NFT is ERC721 {
     using Counters for Counters.Counter;
     Counters.Counter private currentTokenId;
+    string public baseTokenURI;
 
-    constructor() ERC721("PracticeNFT", "NFT") {}
+    constructor() ERC721("PracticeNFT", "NFT") {
+        baseTokenURI = "";
+    }
 
     function mintTo(address recipient) public returns (uint256) {
         currentTokenId.increment();
         uint256 newTokenId = currentTokenId.current();
         _safeMint(recipient, newTokenId);
         return newTokenId;
+    }
+
+    // This will be called by OpenZeppelin's tokenURI function, which will return
+    // _baseURI() + tokenId
+    function _baseURI() internal view virtual override returns (string memory) {
+        return baseTokenURI;
+    }
+
+    function setBaseTokenURI(string memory _baseTokenURI) public {
+        baseTokenURI = _baseTokenURI;
     }
 }

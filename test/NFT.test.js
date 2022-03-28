@@ -31,4 +31,15 @@ describe("NFT tests", function() {
         expect(numOwnedByDeployer).to.equal(1);
         expect(numOwnedByAcct2).to.equal(0);
     })
+
+    it("should set the base token URI", async function() {
+        const BASE_TOKEN_URI = "https://example.com/"
+        const nft = await deployNFTContract();
+        const [deployer] = await ethers.getSigners()
+
+        await nft.setBaseTokenURI(BASE_TOKEN_URI);
+        await nft.mintTo(deployer.address);
+
+        expect(await nft.tokenURI(1)).to.equal(`${BASE_TOKEN_URI}1`);
+    })
 })
