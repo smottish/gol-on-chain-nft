@@ -34,7 +34,7 @@ contract NFT is ERC721, PullPayment, Ownable {
         baseTokenURI = "";
     }
 
-    function mintTo(address recipient, uint seed) public payable returns (uint256) {
+    function _mintTo(address recipient, uint seed) internal returns (uint256) {
         uint256 tokenId = currentTokenId.current();
         require(tokenId < TOTAL_SUPPLY, "Max supply reached");
         require(msg.value == MINT_PRICE, "Transaction value didn't equal the mint price");
@@ -46,8 +46,13 @@ contract NFT is ERC721, PullPayment, Ownable {
         idToSeed[newTokenId] = seed;
         seedToId[seed] = newTokenId;
         _safeMint(recipient, newTokenId);
-        _asyncTransfer(owner(), msg.value);
         return newTokenId;
+    }
+
+    function mintTo(address recipient, uint seed) public payable returns (uint256) {
+        uint256 tokenId = _mintTo(recipient, seed);
+        _asyncTransfer(owner(), msg.value);
+        return tokenId;
     }
 
     // This will be called by OpenZeppelin's tokenURI function, which will return

@@ -28,16 +28,9 @@ describe("NFT tests", function() {
      * to fail if we're not careful.
      */
 
-    async function deployNFTContract() {
-        const NFT = await ethers.getContractFactory("NFT");
+    async function deployNFTContract(name="NFT") {
+        const NFT = await ethers.getContractFactory(name);
         const nft = await NFT.deploy()
-        await nft.deployed();
-        return nft;
-    }
-
-    async function deployTestNFTContract() {
-        const NFTTest = await ethers.getContractFactory("NFTTest");
-        const nft = await NFTTest.deploy()
         await nft.deployed();
         return nft;
     }
@@ -163,7 +156,7 @@ describe("NFT tests", function() {
         ].concat(Array(126).fill(
             "xxxxxxxxooooooooxxxxxxxxooooooooxxxxxxxxooooooooxxxxxxxxooooooooxxxxxxxxooooooooxxxxxxxxooooooooxxxxxxxxooooooooxxxxxxxxoooooooo")
         )
-        const nft = await deployTestNFTContract();
+        const nft = await deployNFTContract("NFTTest");
         const [deployer] = await ethers.getSigners()
         await nft.mintTo(deployer.address, 1, {
             value: MINT_PRICE,
@@ -189,5 +182,24 @@ describe("NFT tests", function() {
             expected.push(solidityKeccak256ToUint256(i))
         }
         expect(initialState).to.deep.equal(expected)
+    })
+
+    it("should have initial state in tx logs", async function() {
+        const INITIAL_STATE = [
+            "oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo\n",
+            "ooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooox\n"
+        ].concat(Array(126).fill(
+            "xxxxxxxxooooooooxxxxxxxxooooooooxxxxxxxxooooooooxxxxxxxxooooooooxxxxxxxxooooooooxxxxxxxxooooooooxxxxxxxxooooooooxxxxxxxxoooooooo\n")
+        ).join("")
+        const nft = await deployNFTContract("NFTTest");
+        const [deployer] = await ethers.getSigners()
+        await nft.mintAndLog(deployer.address, 1, {
+            value: MINT_PRICE,
+        });
+        const filter = nft.filters.Minted();
+        const events = await nft.queryFilter(filter);
+        // Hex representation of the initial state, without the leading 0x
+        const initialStateHex = ethers.utils.hexlify(ethers.utils.toUtf8Bytes(INITIAL_STATE)).slice(2)
+        expect(events[0].data).to.include(initialStateHex);
     })
 })
