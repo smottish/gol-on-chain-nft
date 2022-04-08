@@ -9,6 +9,16 @@ describe("NFT tests", function() {
     const MINT_PRICE = ethers.utils.parseEther("0.01");
     const MAX_SUPPLY = 10;
 
+    function solidityKeccak256ToUint256(num) {
+        // Discovered through trial and error that abi.encodePacked(num) is the number
+        // padded to 256 bits (32 bytes). That's all we're doing here: turning num into
+        // a 32 byte number and representing it as a hex string (though a byte array
+        // might work too)
+        const numEncodePacked = ethers.utils.hexZeroPad(ethers.utils.hexlify(num), 32);
+        const hash = ethers.utils.keccak256(numEncodePacked);
+        return ethers.BigNumber.from(hash);
+    }
+
     /*
      * NOTE: If it takes too long to deploy the contract for
      * each test, then I can deploy it once in a before hook,
@@ -25,10 +35,17 @@ describe("NFT tests", function() {
         return nft;
     }
 
+    async function deployTestNFTContract() {
+        const NFTTest = await ethers.getContractFactory("NFTTest");
+        const nft = await NFTTest.deploy()
+        await nft.deployed();
+        return nft;
+    }
+
     it("should mint a new NFT", async function() {
         const nft = await deployNFTContract();
         const [deployer, acct2] = await ethers.getSigners()
-        await nft.mintTo(deployer.address, {
+        await nft.mintTo(deployer.address, 1, {
             value: MINT_PRICE,
         });
 
@@ -43,7 +60,7 @@ describe("NFT tests", function() {
     it("should not mint an NFT if the tx value is too low", async function() {
         const nft = await deployNFTContract();
         const [deployer] = await ethers.getSigners()
-        await expect(nft.mintTo(deployer.address, {
+        await expect(nft.mintTo(deployer.address, 1, {
             value: MINT_PRICE.sub(ethers.utils.parseUnits("1", "wei")),
         })).to.be.rejected;
         expect(await nft.balanceOf(deployer.address)).to.equal(0);
@@ -55,7 +72,7 @@ describe("NFT tests", function() {
         const [deployer] = await ethers.getSigners()
 
         await nft.setBaseTokenURI(BASE_TOKEN_URI);
-        await nft.mintTo(deployer.address, {
+        await nft.mintTo(deployer.address, 1, {
             value: MINT_PRICE,
         });
 
@@ -67,7 +84,7 @@ describe("NFT tests", function() {
         const [deployer, acct2] = await ethers.getSigners();
 
         expect(await nft.owner()).to.equal(deployer.address);
-        await nft.mintTo(acct2.address, {
+        await nft.mintTo(acct2.address, 1, {
             value: MINT_PRICE,
         });
 
@@ -97,14 +114,80 @@ describe("NFT tests", function() {
     it("should not mint more than 10", async function() {
         const nft = await deployNFTContract();
         const [deployer] = await ethers.getSigners();
-        const mint = () => nft.mintTo(deployer.address, {
+        const mint = (seed) => nft.mintTo(deployer.address, seed, {
             value: MINT_PRICE,
         });
 
         for (let i = 0; i < MAX_SUPPLY; i++) {
-            await mint();
+            await mint(i);
         }
 
-        await expect(mint()).to.be.rejected;
+        await expect(mint(100)).to.be.rejected;
+    })
+
+    it("should return the initial state that's a 128 x 128 grid", async function() {
+        const nft = await deployNFTContract();
+        const [deployer] = await ethers.getSigners();
+        await nft.mintTo(deployer.address, 1, {
+            value: MINT_PRICE,
+        });
+
+        const initialState = await nft.draw(1);
+        const rows = initialState.split("\n");
+        rows.pop() // Last row will be empty
+        expect(rows.length).to.equal(128);
+        for (let i = 0; i < rows.length; i++) {
+            expect(rows[i].length).to.equal(128);
+        }
+    })
+
+    it("should not mint an NFT if the seed is already taken", async function() {
+        const nft = await deployNFTContract();
+        const [deployer] = await ethers.getSigners();
+        const mint = (seed) => nft.mintTo(deployer.address, seed, {
+            value: MINT_PRICE,
+        });
+        await mint(1);
+        await expect(mint(1)).to.be.rejected;
+    })
+
+    it("should not draw a token that doesn't exist", async function() {
+        const nft = await deployNFTContract();
+        await expect(nft.draw(1)).to.be.rejected;
+    })
+
+    it("should draw the expected initial grid", async function() {
+        const expected = [
+            "oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo",
+            "ooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooox"
+        ].concat(Array(126).fill(
+            "xxxxxxxxooooooooxxxxxxxxooooooooxxxxxxxxooooooooxxxxxxxxooooooooxxxxxxxxooooooooxxxxxxxxooooooooxxxxxxxxooooooooxxxxxxxxoooooooo")
+        )
+        const nft = await deployTestNFTContract();
+        const [deployer] = await ethers.getSigners()
+        await nft.mintTo(deployer.address, 1, {
+            value: MINT_PRICE,
+        });
+        const initialState = await nft.draw(1)
+        const rows = initialState.split("\n");
+        rows.pop() // Last row will be empty
+        expect(rows).to.deep.equal(expected)
+    })
+
+    it("should produce the expected initial state", async function() {
+        const expected = []
+        const nft = await deployNFTContract();
+        const [deployer] = await ethers.getSigners()
+        await nft.mintTo(deployer.address, 1, {
+            value: MINT_PRICE,
+        });
+        const initialState = await nft.getInitialState(1);
+
+        // The seed is 1, so initial state is just the
+        // keccak256 hash of 1 to 64, converted to uint256's
+        for (let i = 1; i <= 64; i++) {
+            expected.push(solidityKeccak256ToUint256(i))
+        }
+        expect(initialState).to.deep.equal(expected)
     })
 })
