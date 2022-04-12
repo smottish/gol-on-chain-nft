@@ -118,7 +118,7 @@ describe("NFT tests", function() {
         await expect(mint(100)).to.be.rejected;
     })
 
-    it("should return the initial state that's a 128 x 128 grid", async function() {
+    it("should return the initial state that's a 64 x 64 grid", async function() {
         const nft = await deployNFTContract();
         const [deployer] = await ethers.getSigners();
         await nft.mintTo(deployer.address, 1, {
@@ -128,9 +128,9 @@ describe("NFT tests", function() {
         const initialState = await nft.draw(1);
         const rows = initialState.split("\n");
         rows.pop() // Last row will be empty
-        expect(rows.length).to.equal(128);
+        expect(rows.length).to.equal(64);
         for (let i = 0; i < rows.length; i++) {
-            expect(rows[i].length).to.equal(128);
+            expect(rows[i].length).to.equal(64);
         }
     })
 
@@ -151,10 +151,12 @@ describe("NFT tests", function() {
 
     it("should draw the expected initial grid", async function() {
         const expected = [
-            "oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo",
-            "ooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooox"
-        ].concat(Array(126).fill(
-            "xxxxxxxxooooooooxxxxxxxxooooooooxxxxxxxxooooooooxxxxxxxxooooooooxxxxxxxxooooooooxxxxxxxxooooooooxxxxxxxxooooooooxxxxxxxxoooooooo")
+            "oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo",
+            "oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo",
+            "oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo",
+            "ooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooox",
+        ].concat(Array(60).fill(
+            "xxxxxxxxooooooooxxxxxxxxooooooooxxxxxxxxooooooooxxxxxxxxoooooooo")
         )
         const nft = await deployNFTContract("NFTTest");
         const [deployer] = await ethers.getSigners()
@@ -177,8 +179,8 @@ describe("NFT tests", function() {
         const initialState = await nft.getInitialState(1);
 
         // The seed is 1, so initial state is just the
-        // keccak256 hash of 1 to 64, converted to uint256's
-        for (let i = 1; i <= 64; i++) {
+        // keccak256 hash of 1 to 16, converted to uint256's
+        for (let i = 1; i <= 16; i++) {
             expected.push(solidityKeccak256ToUint256(i))
         }
         expect(initialState).to.deep.equal(expected)
@@ -186,10 +188,12 @@ describe("NFT tests", function() {
 
     it("should have initial state in tx logs", async function() {
         const INITIAL_STATE = [
-            "oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo\n",
-            "ooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooox\n"
-        ].concat(Array(126).fill(
-            "xxxxxxxxooooooooxxxxxxxxooooooooxxxxxxxxooooooooxxxxxxxxooooooooxxxxxxxxooooooooxxxxxxxxooooooooxxxxxxxxooooooooxxxxxxxxoooooooo\n")
+            "oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo\n",
+            "oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo\n",
+            "oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo\n",
+            "ooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooox\n",
+        ].concat(Array(60).fill(
+            "xxxxxxxxooooooooxxxxxxxxooooooooxxxxxxxxooooooooxxxxxxxxoooooooo\n")
         ).join("")
         const nft = await deployNFTContract("NFTTest");
         const [deployer] = await ethers.getSigners()

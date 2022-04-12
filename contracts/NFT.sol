@@ -11,17 +11,17 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 contract NFT is ERC721, PullPayment, Ownable {
     // Bit array representation of a row in the initial state grid.
     // The number of bits in the uint must match the value of GRID_SIZE.
-    type GridRowBits is uint128;
+    type GridRowBits is uint64;
     // Number of 256-bit uints needed to store the GRID_SIZE x GRID_SIZE
     // initial state grid. If GRID_SIZE changes, we'll need to update
     // this accordingly. E.g. with GRID_SIZE = 128, we can represent two
-    // rows with one uint (256 bits x 2). So we only need 64 uints to
+    // rows with one uint (256 bits / 2). So we only need 64 uints to
     // represent a 128 x 128 grid.
-    uint internal constant INITIAL_STATE_SIZE = 64;
+    uint internal constant INITIAL_STATE_SIZE = 16;
     // The intial state grid will be GRID_SIZE x GRID_SIZE.
     // GRID_SIZE must match the number of bits in GridRowBits and thus must
     // be a power of 2.
-    uint internal constant GRID_SIZE = 128;
+    uint internal constant GRID_SIZE = 64;
     using Counters for Counters.Counter;
     Counters.Counter private currentTokenId;
     string public baseTokenURI;
@@ -85,8 +85,9 @@ contract NFT is ERC721, PullPayment, Ownable {
 
     // Convert a bit array representing a row in the initial state grid (GridRowBits)
     // to its string representation. Write this string representation directly into
-    // the specified row in `grid`. `grid` is a 1D representation of a 129 x 128 grid.
-    // The row width is 129 because an extra byte is needed for the newline character.
+    // the specified row in `grid`. `grid` is a 1D representation of a
+    // (GRID_SIZE + 1) x GRID_SIZE grid. The row width is GRID_SIZE + 1 because an
+    // extra byte is needed for the newline character.
     function _setRow(bytes memory grid, uint row, GridRowBits value) internal pure {
         uint b;
         uint bitmask;
@@ -116,24 +117,35 @@ contract NFT is ERC721, PullPayment, Ownable {
 
     // Extract two initial state rows (representated as bit arrays) from a 256-bit uint.
     // If the underlying type of GridRowBits changes, this function will need to be updated.
-    function _decodeStateValue(uint256 value) internal pure returns(GridRowBits, GridRowBits) {
-        // left most 128 bits
-        uint128 row1 = uint128(value >> 128);
-        // right most 128 bits
-        uint128 row2 = uint128(value & 0x00000000000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF);
-        return (GridRowBits.wrap(row1), GridRowBits.wrap(row2));
+    function _decodeStateValue(uint256 value) internal pure returns(GridRowBits, GridRowBits, GridRowBits, GridRowBits) {
+        uint256 ROW_MASK = 0x000000000000000000000000000000000000000000000000FFFFFFFFFFFFFFFF;
+        // left most 64 bits
+        uint64 row1 = uint64(value >> 192);
+        uint64 row2 = uint64((value >> 128) & ROW_MASK);
+        uint64 row3 = uint64((value >> 64) & ROW_MASK);
+        // right most 64 bits
+        uint64 row4 = uint64(value & ROW_MASK);
+        return (
+            GridRowBits.wrap(row1),
+            GridRowBits.wrap(row2),
+            GridRowBits.wrap(row3),
+            GridRowBits.wrap(row4)
+        );
     }
 
     function draw(uint tokenId) public view returns(string memory) {
         uint i;
+        uint ROWS_PER_INITIAL_STATE_VALUE = 4;
         uint256[INITIAL_STATE_SIZE] memory state = getInitialState(tokenId);
         // Each row has an extra byte for a newline character
         bytes memory output = new bytes(GRID_SIZE * (GRID_SIZE + 1));
 
         for (i = 0; i < INITIAL_STATE_SIZE; i++) {
-            (GridRowBits row1, GridRowBits row2) = _decodeStateValue(state[i]);
-            _setRow(output, i * 2, row1);
-            _setRow(output, (i * 2) + 1, row2);
+            (GridRowBits row1, GridRowBits row2, GridRowBits row3, GridRowBits row4) = _decodeStateValue(state[i]);
+            _setRow(output, i * ROWS_PER_INITIAL_STATE_VALUE, row1);
+            _setRow(output, (i * ROWS_PER_INITIAL_STATE_VALUE) + 1, row2);
+            _setRow(output, (i * ROWS_PER_INITIAL_STATE_VALUE) + 2, row3);
+            _setRow(output, (i * ROWS_PER_INITIAL_STATE_VALUE) + 3, row4);
         }
 
         return string(output);
