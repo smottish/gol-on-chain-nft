@@ -92,22 +92,27 @@ contract NFT is ERC721, PullPayment, Ownable {
         uint b;
         uint bitmask;
         uint cell;
+        uint unwrappedValue = uint(GridRowBits.unwrap(value));
         // Row width is GRID_SIZE + 1 to accomodate the newline
-        uint LENGTH = (GRID_SIZE + 1) * GRID_SIZE;
+        uint WIDTH = GRID_SIZE + 1;
+        // End index is WIDTH - 1, which is GRID_SIZE + 1 - 1 = GRID_SIZE,
+        // but the last cell contains a newline so we subtract 1 again.
+        uint ROW_END_INDEX = GRID_SIZE - 1;
+        uint ROW_OFFSET = row * WIDTH;
+        uint LENGTH = WIDTH * GRID_SIZE;
 
         require(grid.length == LENGTH, "grid is the wrong length");
 
         // End of the row is the newline character
-        grid[row * (GRID_SIZE + 1) + GRID_SIZE] = '\n';
+        grid[ROW_OFFSET + GRID_SIZE] = '\n';
         for (b = 0; b < GRID_SIZE; b++) {
             // Right most bit is the last cell in a grid row before
             // the newline character
             bitmask = 0x1 << b;
-            // Fill the row from the end to the beginning, skipping the
-            // last cell which contains the newline
-            cell = row * (GRID_SIZE + 1) + (GRID_SIZE - 1 - b);
+            // Fill the row from the end to the beginning
+            cell = ROW_OFFSET + (ROW_END_INDEX - b);
             // Check if bit is set
-            if ((bitmask & GridRowBits.unwrap(value)) == bitmask) {
+            if ((bitmask & unwrappedValue) == bitmask) {
                 grid[cell] = 'x';
             } else {
                 grid[cell] = 'o';
